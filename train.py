@@ -2,8 +2,6 @@ import os
 import torch
 import torch.optim as optim
 from tqdm import tqdm
-from get_model import get_model
-from torchvision import transforms
 from dataset import VODataset
 from model.network import VisionTransformer
 from torch.utils.data import random_split
