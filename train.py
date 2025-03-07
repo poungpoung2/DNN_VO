@@ -6,8 +6,6 @@ from dataset import VODataset
 from model.network import VisionTransformer
 from torch.utils.data import random_split
 from config import Config
-import pickle
-import json
 
 
 torch.manual_seed(2023)
