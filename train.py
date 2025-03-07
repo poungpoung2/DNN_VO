@@ -35,7 +35,7 @@ def train_epoch(model, train_loader, criterion, optimizer, epoch, args):
     with tqdm(train_loader, unit="batch") as tepoch:
         for images, gt in tepoch:
             if torch.cuda.is_available():
-                images, gt = images.cudo(), gt.cuda()
+                images, gt = images.cuda(), gt.cuda()
 
             # predict pose
             estimated_pose = model(images.float())
@@ -53,7 +53,7 @@ def train(model, train_loarder, val_loader, criterion, optimizer, args):
     epochs = args["epoch"]
     checkpoint_path = args["checkpoint_path"]
 
-    for epoch in range(len(epochs)):
+    for epoch in range(epochs):
         model.train()
         train_loss = train_epoch(model, train_loader, criterion, optimizer, epoch, args)
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     # set hyperparameters and configuration
     args = {
-        "data_dir": "data",
+        "data_dir": "/home/undergrad3203/Downloads/data/V1_01_easy",
         "bsize": 4,  # batch size
         "val_split": 0.1,  # percentage to use as validation data
         "window_size": 3,  # number of frames in window
@@ -157,7 +157,7 @@ if __name__ == "__main__":
             std=[0.30737526, 0.31515116, 0.32020183]),
     ])
 
-    dataset = VODataset(args, preprocess)
+    dataset = VODataset(config=args, transform=preprocess)
     nb_val = round(args["val_split"] * len(dataset))
 
     train_data, val_data = random_split(dataset, [len(dataset) - nb_val, nb_val]) #generator=torch.Generator().manual_seed(2))

@@ -3,9 +3,9 @@ import numpy as np
 
 def euler_to_rot(pose):
     # Extract Euler angles
-    gamma = pose["roll"]  # X-axis rotation
-    beta = pose["pitch"]  # Y-axis rotation
-    alpha = pose["yaw"]  # Z-axis rotation
+    gamma = pose["orientation"][0]  # X-axis rotation
+    beta = pose["orientation"][1]  # Y-axis rotation
+    alpha = pose["orientation"][2]  # Z-axis rotation
 
     # Precompute sine and cosine values
     cos_alpha, sin_alpha = np.cos(alpha), np.sin(alpha)
@@ -37,7 +37,7 @@ def pose_to_trans(pose):
 
     T = np.eye(4)
     T[:3, :3] = R
-    T[:3, 3] = [pose["x"], pose["y"], pose["z"]]
+    T[:3, 3] = [pose["position"][0], pose["position"][1], pose["position"][2]]
 
     return T
 

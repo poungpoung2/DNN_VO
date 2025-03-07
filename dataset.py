@@ -1,8 +1,9 @@
 import torch
+import glob
 import os
 from torch.utils.data import Dataset
 from pathlib import Path
-from torchvision.transforms import v2
+from torchvision import transforms
 import pandas as pd
 from PIL import Image
 import numpy as np
@@ -12,16 +13,16 @@ from utils import get_relative_pose
 class VODataset(Dataset):
     def __init__(self, config, transform=None):
         # Initialize data, download, etc.
-        image_dir = os.path.join(config["data_dir"], "/images")
-        pose_dir = os.path.join(config["data_dir"], "/poses")
+        image_dir = os.path.join(Path(config["data_dir"]), "cam0")
+        pose_dir = os.path.join(Path(config["data_dir"]), "poses.csv")
         self.image_dir = Path(image_dir)
 
         if transform is None:
-            self.transforms = v2.Compose(
+            self.transforms = transforms.Compose(
                 [
-                    v2.Resize((config["model_params"]["image_size"])),
-                    v2.ToDtype(torch.float32, scale=True),
-                    v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                    transforms.Resize((config["model_params"]["image_size"])),
+                    transforms.ToDtype(torch.float32, scale=True),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                 ]
             )
         else:
@@ -29,7 +30,7 @@ class VODataset(Dataset):
 
         self.clip_size = config["window_size"]
         self.clips = []
-        for i in range(len(self.image_dir) - self.clip_size + 1):
+        for i in range(len(list(self.image_dir.glob("*.jpg"))) - self.clip_size + 1):
             self.clips.append((i, i + self.clip_size))
 
         df = pd.read_csv(pose_dir)
@@ -55,7 +56,7 @@ class VODataset(Dataset):
         # Load images
         images = []
         for img_idx in clip_indices:
-            img_path = self.image_dir / f"{img_idx}.jpg"
+            img_path = self.image_dir / f"{img_idx:06d}.jpg"
             img = Image.open(img_path).convert("RGB")
             img = self.transforms(img)
             images.append(img)
