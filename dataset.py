@@ -73,6 +73,6 @@ class VODataset(Dataset):
         # Stack tensors
         image_tensor = torch.stack(images, dim=0)
         pose_tensor = torch.tensor(np.array(poses), dtype=torch.float32)
-        pose_tensor = pose_tensor.reshape(-1, (self.clip_size - 1)*6)
+        pose_tensor = pose_tensor.reshape((self.clip_size - 1)*6)
 
         return image_tensor, pose_tensor
