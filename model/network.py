@@ -36,7 +36,7 @@ class Attention(nn.Module):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim ** -0.5
+        self.scale = qkv_scale or head_dim ** -0.5
         self.with_qkv = with_qkv
         if self.with_qkv:
             self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
@@ -73,7 +73,7 @@ class Block(nn.Module):
 
         # Temporal Attention
         self.norm1 = norm_layer(dim)
-        self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=proj_drop)
+        self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop)
         self.fc = nn.Linear(dim, dim)
 
         ## drop path
@@ -143,7 +143,6 @@ class VisionTransformer(nn.Module):
                  drop_path_rate=0.1, hybrid_backbone=None, norm_layer=nn.LayerNorm, num_frames=8, dropout=0.):
 
         super().__init__()
-        self.attention_type = "divided_space_time"
         self.depth = depth
         self.dropout = nn.Dropout(dropout)
         self.num_classes = num_classes
@@ -165,7 +164,7 @@ class VisionTransformer(nn.Module):
         self.blocks = nn.ModuleList([
             Block(
                 dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer, attention_type=self.attention_type)
+                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer)
             for i in range(self.depth)])
         self.norm = norm_layer(embed_dim)
 

@@ -4,11 +4,14 @@ import torch.optim as optim
 from tqdm import tqdm
 from get_model import get_model
 from torchvision import transforms
-from datasets.dataset import KITTI
+from dataset import VODataset
+from config import Config
 from torch.utils.data import random_split
 import pickle
 import json
 
+IMG_PATH = "../Data/..."
+POSE_PATH = "../Data/..."
 
 torch.manual_seed(2023)
 
@@ -103,7 +106,7 @@ if __name__ == "__main__":
         "data_dir": "data",
         "bsize": 4,  # batch size
         "val_split": 0.1,  # percentage to use as validation data
-        "window_size": 2,  # number of frames in window
+        "window_size": 3,  # number of frames in window
         "overlap": 1,  # number of frames overlapped between windows
         "optimizer": "Adam",  # optimizer [Adam, SGD, Adagrad, RAdam]
         "lr": 1e-5,  # learning rate
@@ -135,6 +138,8 @@ if __name__ == "__main__":
     }
     args["model_params"] = model_params
 
+    dataset_cfg = Config()
+
     # create checkpoints folder
     if not os.path.exists(args["checkpoint_path"]):
         os.makedirs(args["checkpoint_path"])
@@ -157,7 +162,7 @@ if __name__ == "__main__":
             std=[0.30737526, 0.31515116, 0.32020183]),
     ])
 
-    dataset = KITTI(window_size=args["window_size"], overlap=args["overlap"], transform=preprocess)
+    dataset = VODataset(dataset_cfg, image_dir=IMG_PATH, pose_path=POSE_PATH)
     nb_val = round(args["val_split"] * len(dataset))
 
     train_data, val_data = random_split(dataset, [len(dataset) - nb_val, nb_val]) #generator=torch.Generator().manual_seed(2))
