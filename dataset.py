@@ -1,5 +1,4 @@
 import torch
-import glob
 import os
 from torch.utils.data import Dataset
 from pathlib import Path
@@ -13,22 +12,23 @@ from utils import get_relative_pose
 class VODataset(Dataset):
     def __init__(self, config, transform=None):
         # Initialize data, download, etc.
-        image_dir = os.path.join(Path(config["data_dir"]), "cam0")
-        pose_dir = os.path.join(Path(config["data_dir"]), "poses.csv")
+        image_dir = os.path.join(Path(config.data_dir), "cam0")
+        pose_dir = os.path.join(Path(config.data_dir), "poses.csv")
         self.image_dir = Path(image_dir)
 
         if transform is None:
-            self.transforms = transforms.Compose(
-                [
-                    transforms.Resize((config["model_params"]["image_size"])),
-                    transforms.ToDtype(torch.float32, scale=True),
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ]
-            )
+                # preprocessing operation
+            self.transforms = transforms.Compose([
+                transforms.Resize((config.image_size)),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.34721234, 0.36705238, 0.36066107],
+                    std=[0.30737526, 0.31515116, 0.32020183]),
+            ])
         else:
             self.transforms = transform
 
-        self.clip_size = config["window_size"]
+        self.clip_size = config.num_frames
         self.clips = []
         for i in range(len(list(self.image_dir.glob("*.jpg"))) - self.clip_size + 1):
             self.clips.append((i, i + self.clip_size))

@@ -1,18 +1,18 @@
 import os
 import torch
+import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
-from get_model import get_model
-from torchvision import transforms
 from dataset import VODataset
+from model.network import VisionTransformer
 from torch.utils.data import random_split
-import pickle
-import json
+from config import Config
+from functools import partial
 
 
 torch.manual_seed(2023)
 
-def val_epoch(model, val_loader, criterion, args):
+def val_epoch(model, val_loader, criterion):
     epoch_loss = 0
 
     with tqdm(val_loader, unit="batch") as tepoch:
@@ -21,15 +21,14 @@ def val_epoch(model, val_loader, criterion, args):
                 images, gt = images.cuda(), gt.cuda()
 
             estimate_pose = model(images.float())
-
-            loss = compute_loss(estimate_pose, gt, criterion, args)
+            loss = criterion(estimate_pose, gt.float())
 
             epoch_loss += loss.item()
 
     
     return epoch_loss / len(val_loader)
 
-def train_epoch(model, train_loader, criterion, optimizer, epoch, args):
+def train_epoch(model, train_loader, criterion, optimizer, epoch):
     epoch_loss = 0
     iter = (epoch - 1) * len(train_loader) + 1
     with tqdm(train_loader, unit="batch") as tepoch:
@@ -38,8 +37,8 @@ def train_epoch(model, train_loader, criterion, optimizer, epoch, args):
                 images, gt = images.cuda(), gt.cuda()
 
             # predict pose
-            estimated_pose = model(images.float())
-            loss = compute_loss(estimated_pose, gt, criterion, args)
+            estimate_pose = model(images.float())
+            loss = criterion(estimate_pose, gt.float())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -49,19 +48,20 @@ def train_epoch(model, train_loader, criterion, optimizer, epoch, args):
     
     return epoch_loss / len(train_loader)
 
-def train(model, train_loarder, val_loader, criterion, optimizer, args):
-    epochs = args["epoch"]
-    checkpoint_path = args["checkpoint_path"]
+def train(model, train_loarder, val_loader, criterion, optimizer, cfg):
+    epochs = cfg.epoch
+    checkpoint_path = cfg.checkpoint_path
+    epoch_init = cfg.epoch_init
 
-    for epoch in range(epochs):
+    for epoch in range(epoch_init-1, epochs):
         model.train()
-        train_loss = train_epoch(model, train_loader, criterion, optimizer, epoch, args)
+        train_loss = train_epoch(model, train_loader, criterion, optimizer, epoch)
 
         # validate model
         if val_loader:
             with torch.no_grad():
                 model.eval()
-                val_loss = val_epoch(model, val_loader, criterion, args)
+                val_loss = val_epoch(model, val_loader, criterion)
 
             print(f"Epoch: {epoch} - loss: {train_loss:.4f} - val_loss: {val_loss:.4f} \n")
 
@@ -79,91 +79,27 @@ def train(model, train_loarder, val_loader, criterion, optimizer, args):
     return
 
 
-def get_optimizer(params, args):
-    method = args["optimizer"]
-
-    if method == "Adam":
-        optimizer = optim.Adam(params, lr=args["lr"])
-    
-    return optimizer
-
-def compute_loss(y_hat, y, criterion, args):
-    if args["weighted_loss"] == None:
-        loss = criterion(y_hat, y.float())
-    else:
-        loss = criterion(y_hat, y.float())
-
-    return loss
-
 if __name__ == "__main__":
 
-    # set hyperparameters and configuration
-    args = {
-        "data_dir": "/home/undergrad3203/Downloads/data/V1_01_easy",
-        "bsize": 4,  # batch size
-        "val_split": 0.1,  # percentage to use as validation data
-        "window_size": 3,  # number of frames in window
-        "overlap": 1,  # number of frames overlapped between windows
-        "optimizer": "Adam",  # optimizer [Adam, SGD, Adagrad, RAdam]
-        "lr": 1e-5,  # learning rate
-        "momentum": 0.9,  # SGD momentum
-        "weight_decay": 1e-4,  # SGD momentum
-        "epoch": 100,  # train iters each timestep
-    	"weighted_loss": None,  # float to weight angles in loss function
-      	"pretrained_ViT": True,  # load weights from pre-trained ViT
-        "checkpoint_path": "checkpoints/Exp4",  # path to save checkpoint
-        "checkpoint": None,  # checkpoint
-    }
-
-    # tiny  - patch_size=16, embed_dim=192, depth=12, num_heads=3
-    # small - patch_size=16, embed_dim=384, depth=12, num_heads=6
-    # base  - patch_size=16, embed_dim=768, depth=12, num_heads=12
-    model_params = {
-        "dim": 384,
-        "image_size": (192, 640),  #(192, 640), (640, 640)
-        "patch_size": 16,
-        "attention_type": 'divided_space_time',  # ['divided_space_time', 'space_only','joint_space_time', 'time_only']
-        "num_frames": args["window_size"],
-        "num_classes": 6 * (args["window_size"] - 1),  # 6 DoF for each frame
-        "depth": 12,
-        "heads": 6,
-        "dim_head": 64,
-        "attn_dropout": 0.1,
-        "ff_dropout": 0.1,
-        "time_only": False,
-    }
-    args["model_params"] = model_params
+    config = Config()
 
     # create checkpoints folder
-    if not os.path.exists(args["checkpoint_path"]):
-        os.makedirs(args["checkpoint_path"])
-
-    with open(os.path.join(args["checkpoint_path"], 'args.pkl'), 'wb') as f:
-        pickle.dump(args, f)
-    with open(os.path.join(args["checkpoint_path"], 'args.txt'), 'w') as f:
-        f.write(json.dumps(args))
+    if not os.path.exists(config.checkpoint_path):
+        os.makedirs(config.checkpoint_path)
 
     # train and val dataloader
     print("Using CUDA: ", torch.cuda.is_available())
     print("Loading data...")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # preprocessing operation
-    preprocess = transforms.Compose([
-        transforms.Resize((model_params["image_size"])),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.34721234, 0.36705238, 0.36066107],
-            std=[0.30737526, 0.31515116, 0.32020183]),
-    ])
+    dataset = VODataset(config=config)
+    nb_val = round(config.val_split * len(dataset))
 
-    dataset = VODataset(config=args, transform=preprocess)
-    nb_val = round(args["val_split"] * len(dataset))
-
-    train_data, val_data = random_split(dataset, [len(dataset) - nb_val, nb_val]) #generator=torch.Generator().manual_seed(2))
+    train_data, val_data = random_split(dataset, [len(dataset) - nb_val, nb_val]) 
     
     train_loader = torch.utils.data.DataLoader(train_data,
-                                               batch_size=args["bsize"],
+                                               batch_size=config.batch_size,
                                                shuffle=True,
                                                )
     val_loader = torch.utils.data.DataLoader(val_data,
@@ -173,13 +109,36 @@ if __name__ == "__main__":
 
     # build and load model
     print("Building model...")
-    model, args = get_model(args, model_params)
+    model = VisionTransformer(img_size=config.image_size,
+                              num_classes=config.num_classes,
+                              patch_size=config.patch_size,
+                              embed_dim=config.dim,
+                              depth=config.depth,
+                              num_heads=config.num_heads,
+                              mlp_ratio=4,
+                              qkv_bias=True,
+                              norm_layer=partial(nn.LayerNorm, eps=1e-6),
+                              drop_rate=0.,
+                              attn_drop_rate=config.attn_dropout,
+                              drop_path_rate=config.ff_dropout,
+                              num_frames=config.num_frames)
     model = model.to(device)
+
     # loss and optimizer
     criterion = torch.nn.MSELoss()
-    optimizer = get_optimizer(model.parameters(), args)
+    optimizer = optimizer = optim.Adam(model.parameters(), lr=config.lr)
+
+    if config.pretrained is not None:
+        state_dict = torch.load(config.pretrained)
+        model.load_state_dict(state_dict["model_state_dict"])
+
+    elif config.checkpoint is not None:
+        checkpoint = torch.load(os.path.join(config.checkpoint_path, config.checkpoint))
+        config.epoch_init = checkpoint["epoch"]
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
     # train network
     print(20*"--" +  " Training " + 20*"--")
-    train(model, train_loader, val_loader, criterion, optimizer, args)
+    train(model, train_loader, val_loader, criterion, optimizer, config)
 
