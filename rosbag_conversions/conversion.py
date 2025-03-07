@@ -58,7 +58,7 @@ def process_bag_file(file_path):
             cv_image = bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
             images_cam1[timestamp] = cv_image
 
-        if topic in ("vicon/firefly_sbx/firefly_sbx", "vicon/firefly_sbx/firefly_sbx"):
+        if topic == "vicon/firefly_sbx/firefly_sbx" or topic == "/vicon/firefly_sbx/firefly_sbx":
             pose = Pose(msg)
             poses[timestamp] = pose
             pose_timestamps.append(timestamp)
@@ -118,13 +118,13 @@ def process_bag_file(file_path):
             pose_dict = pose.return_dict()
             
             writer.writerow({
-                'image': i,
-                'x': pose_dict['x'],
-                'y': pose_dict['y'],
-                'z': pose_dict['z'],
-                'roll': pose_dict['roll'],
-                'pitch': pose_dict['pitch'],
-                'yaw': pose_dict['yaw']
+                'image': f"{i}",  
+                'x': f"{pose_dict['x']:.6f}",
+                'y': f"{pose_dict['y']:.6f}",
+                'z': f"{pose_dict['z']:.6f}",
+                'roll': f"{pose_dict['roll']:.6f}",
+                'pitch': f"{pose_dict['pitch']:.6f}",
+                'yaw': f"{pose_dict['yaw']:.6f}"
             })
 
     print(f"Processed {len(image_pose_pairs)} image-pose pairs from {file_path}")
