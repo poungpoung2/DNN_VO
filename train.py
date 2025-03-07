@@ -3,12 +3,9 @@ import torch
 import torch.optim as optim
 from tqdm import tqdm
 from get_model import get_model
-from torchvision import transforms
 from dataset import VODataset
 from torch.utils.data import random_split
 from config import Config
-import pickle
-import json
 
 
 torch.manual_seed(2023)
