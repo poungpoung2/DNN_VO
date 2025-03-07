@@ -129,7 +129,8 @@ if __name__ == "__main__":
     optimizer = optimizer = optim.Adam(model.parameters(), lr=config.lr)
 
     if config.pretrained is not None:
-        model.load_state_dict(config.pretrained)
+        state_dict = torch.load(config.pretrained)
+        model.load_state_dict(state_dict["model_state_dict"])
 
     elif config.checkpoint is not None:
         checkpoint = torch.load(os.path.join(config.checkpoint_path, config.checkpoint))
