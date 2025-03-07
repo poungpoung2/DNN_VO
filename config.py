@@ -7,9 +7,10 @@ class Config():
         self.num_frames = 3 # number of frames
         self.lr = 1e-5 # learning rate
         self.epoch = 100
-        self.pretrained = False # load pretrained weights
+        self.epoch_init = 1
+        self.pretrained = None # load pretrained weights
         self.checkpoint_path = "checkpoints/Exp4" # path to save checkpoint
-        self.load_checkpoint = None
+        self.checkpoint = None
 
 
         # tiny  - patch_size=16, embed_dim=192, depth=12, num_heads=3

@@ -5,6 +5,7 @@ from tqdm import tqdm
 from get_model import get_model
 from torchvision import transforms
 from dataset import VODataset
+from model.network import VisionTransformer
 from torch.utils.data import random_split
 from config import Config
 import pickle
@@ -52,8 +53,9 @@ def train_epoch(model, train_loader, criterion, optimizer, epoch):
 def train(model, train_loarder, val_loader, criterion, optimizer, cfg):
     epochs = cfg.epoch
     checkpoint_path = cfg.checkpoint_path
+    epoch_init = cfg.epoch_init
 
-    for epoch in range(epochs):
+    for epoch in range(epoch_init-1, epochs):
         model.train()
         train_loss = train_epoch(model, train_loader, criterion, optimizer, epoch)
 
@@ -109,11 +111,33 @@ if __name__ == "__main__":
 
     # build and load model
     print("Building model...")
-    model = get_model(config)
+    model = VisionTransformer(img_size=config.image_size,
+                              num_classes=config.num_classes,
+                              patch_size=config.patch_size,
+                              embed_dim=config.dim,
+                              depth=config.depth,
+                              num_heads=config.num_heads,
+                              mlp_ratio=4,
+                              qkv_bias=True,
+                              norm_layer=partial(nn.LayerNorm, eps=1e-6),
+                              drop_rate=0.,
+                              attn_drop_rate=config.attn_dropout,
+                              drop_path_rate=config.ff_dropout,
+                              num_frames=config.num_frames)
     model = model.to(device)
+
     # loss and optimizer
     criterion = torch.nn.MSELoss()
     optimizer = optimizer = optim.Adam(model.parameters(), lr=config.lr)
+
+    if config.pretrained is not None:
+        model.load_state_dict(config.pretrained)
+
+    elif config.checkpoint is not None:
+        checkpoint = torch.load(os.path.join(config.checkpoint_path, config.checkpoint))
+        config.epoch_init = checkpoint["epoch"]
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
     # train network
     print(20*"--" +  " Training " + 20*"--")
