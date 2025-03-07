@@ -1,11 +1,13 @@
 import os
 import torch
+import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 from dataset import VODataset
 from model.network import VisionTransformer
 from torch.utils.data import random_split
 from config import Config
+from functools import partial
 
 
 torch.manual_seed(2023)
