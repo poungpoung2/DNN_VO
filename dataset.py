@@ -55,7 +55,7 @@ class VODataset(Dataset):
 
         # Load images
         images = []
-        for img_idx in clip_indices:
+        for img_idx in range(clip_indices[0], clip_indices[1]):
             img_path = self.image_dir / f"{img_idx:06d}.jpg"
             img = Image.open(img_path).convert("RGB")
             img = self.transforms(img)
@@ -63,12 +63,9 @@ class VODataset(Dataset):
 
         # Calculate relative poses
         poses = []
-        for i in range(len(clip_indices) - 1):
-            curr_idx = clip_indices[i]
-            next_idx = clip_indices[i + 1]
-
-            curr_pose = self.poses[curr_idx]
-            next_pose = self.poses[next_idx]
+        for i in range(clip_indices[0], clip_indices[1]-1):
+            curr_pose = self.poses[i]
+            next_pose = self.poses[i+1]
 
             rel_pose = get_relative_pose(curr_pose, next_pose)
             poses.append(rel_pose)
@@ -76,5 +73,6 @@ class VODataset(Dataset):
         # Stack tensors
         image_tensor = torch.stack(images, dim=0)
         pose_tensor = torch.tensor(np.array(poses), dtype=torch.float32)
+        pose_tensor = pose_tensor.reshape(-1, (self.clip_size - 1)*6)
 
         return image_tensor, pose_tensor

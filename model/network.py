@@ -199,7 +199,7 @@ class VisionTransformer(nn.Module):
         x, T, W = self.patch_embed(x) # x ((b t) x patch_num x embed_dim), T: num_frames, W:patch_num
         cls_tokens = self.cls_token.expand(x.size(0), -1, -1)
 
-        x = torch.cat((cls_tokens, x), dim=-1) # x.shape[-1] is number of patches + 1
+        x = torch.cat((cls_tokens, x), dim=1) # x.shape[-1] is number of patches + 1
 
         ## resizing the positional embeddings in case they don't match the input at inference
         if x.size(1) != self.pos_embed.size(1):

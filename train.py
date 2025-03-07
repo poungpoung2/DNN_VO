@@ -88,7 +88,8 @@ def get_optimizer(params, args):
     return optimizer
 
 def compute_loss(y_hat, y, criterion, args):
-
+    print(y_hat.shape)
+    print(y.shape)
     if args["weighted_loss"] == None:
         loss = criterion(y_hat, y.float())
     else:
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     # set hyperparameters and configuration
     args = {
         "data_dir": "/home/undergrad3203/Downloads/data/V1_01_easy",
-        "bsize": 4,  # batch size
+        "bsize": 5,  # batch size
         "val_split": 0.1,  # percentage to use as validation data
         "window_size": 3,  # number of frames in window
         "overlap": 1,  # number of frames overlapped between windows
@@ -147,6 +148,7 @@ if __name__ == "__main__":
     # train and val dataloader
     print("Using CUDA: ", torch.cuda.is_available())
     print("Loading data...")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # preprocessing operation
     preprocess = transforms.Compose([
@@ -174,7 +176,7 @@ if __name__ == "__main__":
     # build and load model
     print("Building model...")
     model, args = get_model(args, model_params)
-
+    model = model.to(device)
     # loss and optimizer
     criterion = torch.nn.MSELoss()
     optimizer = get_optimizer(model.parameters(), args)
