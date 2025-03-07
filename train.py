@@ -5,13 +5,10 @@ from tqdm import tqdm
 from get_model import get_model
 from torchvision import transforms
 from dataset import VODataset
-from config import Config
 from torch.utils.data import random_split
 import pickle
 import json
 
-IMG_PATH = "../Data/..."
-POSE_PATH = "../Data/..."
 
 torch.manual_seed(2023)
 
@@ -138,8 +135,6 @@ if __name__ == "__main__":
     }
     args["model_params"] = model_params
 
-    dataset_cfg = Config()
-
     # create checkpoints folder
     if not os.path.exists(args["checkpoint_path"]):
         os.makedirs(args["checkpoint_path"])
@@ -162,7 +157,7 @@ if __name__ == "__main__":
             std=[0.30737526, 0.31515116, 0.32020183]),
     ])
 
-    dataset = VODataset(dataset_cfg, image_dir=IMG_PATH, pose_path=POSE_PATH)
+    dataset = VODataset(args, preprocess)
     nb_val = round(args["val_split"] * len(dataset))
 
     train_data, val_data = random_split(dataset, [len(dataset) - nb_val, nb_val]) #generator=torch.Generator().manual_seed(2))

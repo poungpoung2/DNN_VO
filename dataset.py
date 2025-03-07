@@ -1,4 +1,5 @@
 import torch
+import os
 from torch.utils.data import Dataset
 from pathlib import Path
 from torchvision.transforms import v2
@@ -9,14 +10,16 @@ from utils import get_relative_pose
 
 
 class VODataset(Dataset):
-    def __init__(self, config, image_dir, pose_path, transform=None):
+    def __init__(self, config, transform=None):
         # Initialize data, download, etc.
+        image_dir = os.path.join(config["data_dir"], "/images")
+        pose_dir = os.path.join(config["data_dir"], "/poses")
         self.image_dir = Path(image_dir)
 
         if transform is None:
             self.transforms = v2.Compose(
                 [
-                    v2.Resize(config.height, config.width),
+                    v2.Resize((config["model_params"]["image_size"])),
                     v2.ToDtype(torch.float32, scale=True),
                     v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                 ]
@@ -24,12 +27,12 @@ class VODataset(Dataset):
         else:
             self.transforms = transform
 
-        self.clip_size = config.size
+        self.clip_size = config["window_size"]
         self.clips = []
-        for i in range(len(self.image_paths) - config.clip_size + 1):
-            self.clips.append((i, i + config.clip_size))
+        for i in range(len(self.image_dir) - self.clip_size + 1):
+            self.clips.append((i, i + self.clip_size))
 
-        df = pd.read_csv(pose_path)
+        df = pd.read_csv(pose_dir)
 
         self.poses = {}
 
