@@ -1,9 +1,7 @@
 import torch
-import glob
-import os
 from torch.utils.data import Dataset
 from pathlib import Path
-from torchvision import transforms
+from torchvision.transforms import v2
 import pandas as pd
 from PIL import Image
 import numpy as np
@@ -11,29 +9,29 @@ from utils import get_relative_pose
 
 
 class VODataset(Dataset):
-    def __init__(self, config, transform=None):
+    def __init__(self, config, base_dir, cam_num, transform=None):
         # Initialize data, download, etc.
-        image_dir = os.path.join(Path(config["data_dir"]), "cam0")
-        pose_dir = os.path.join(Path(config["data_dir"]), "poses.csv")
-        self.image_dir = Path(image_dir)
+        self.image_dir = base_dir / f"cam{cam_num}"
+        self.pose_dir = base_dir / "poses.csv"
+
 
         if transform is None:
-            self.transforms = transforms.Compose(
+            self.transforms = v2.Compose(
                 [
-                    transforms.Resize((config["model_params"]["image_size"])),
-                    transforms.ToDtype(torch.float32, scale=True),
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                    v2.Resize(size=config.image_size),
+                    v2.ToDtype(torch.float32, scale=True),
+                    v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                 ]
             )
         else:
             self.transforms = transform
 
-        self.clip_size = config["window_size"]
+        self.num_frames = config.num_frames
         self.clips = []
-        for i in range(len(list(self.image_dir.glob("*.jpg"))) - self.clip_size + 1):
-            self.clips.append((i, i + self.clip_size))
+        for i in range(len(list(self.image_dir.glob("*.jpg"))) - self.num_frames + 1):
+            self.clips.append((i, i + self.num_frames))
 
-        df = pd.read_csv(pose_dir)
+        df = pd.read_csv(self.pose_dir)
 
         self.poses = {}
 
@@ -73,6 +71,5 @@ class VODataset(Dataset):
         # Stack tensors
         image_tensor = torch.stack(images, dim=0)
         pose_tensor = torch.tensor(np.array(poses), dtype=torch.float32)
-        pose_tensor = pose_tensor.reshape((self.clip_size - 1)*6)
 
         return image_tensor, pose_tensor
