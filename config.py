@@ -1,15 +1,16 @@
 class Config():
 
     def __init__(self):
-        self.data_dir = "/home/undergrad3203/Downloads/data/V1_01_easy" # directory to store data
+        self.data_dir = ["/home/undergrad3203/Downloads/data/V1_01_easy", "/home/undergrad3203/Downloads/data/V1_02_medium", "/home/undergrad3203/Downloads/data/V1_03_difficult",
+                         "/home/undergrad3203/Downloads/data/V2_01_easy", "/home/undergrad3203/Downloads/data/V2_02_medium", "/home/undergrad3203/Downloads/data/V2_03_difficult" ] # directory to store data
         self.batch_size = 2 # size of batch
         self.val_split = 0.1 # percentage to use as validation set
         self.num_frames = 3 # number of frames
         self.lr = 1e-5 # learning rate
         self.epoch = 100
         self.epoch_init = 1
-        self.pretrained = "/home/undergrad3203/Downloads/checkpoint_model2_exp19.pth" # load pretrained weights
-        self.checkpoint_path = "checkpoints/Exp4" # path to save checkpoint
+        self.pretrained = 'checkpoints/Exp1/checkpoint_last.pth' # load pretrained weights
+        self.checkpoint_path = "checkpoints/Exp2" # path to save checkpoint
         self.checkpoint = None
 
 

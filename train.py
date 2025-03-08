@@ -12,7 +12,7 @@ from functools import partial
 
 torch.manual_seed(2023)
 
-def val_epoch(model, val_loader, criterion):
+def val_epoch(model, val_loader, criterion, cfg):
     epoch_loss = 0
 
     with tqdm(val_loader, unit="batch") as tepoch:
@@ -21,14 +21,14 @@ def val_epoch(model, val_loader, criterion):
                 images, gt = images.cuda(), gt.cuda()
 
             estimate_pose = model(images.float())
-            loss = criterion(estimate_pose, gt.float())
+            loss = compute_loss(estimate_pose, gt.float(), criterion, cfg)
 
             epoch_loss += loss.item()
 
     
     return epoch_loss / len(val_loader)
 
-def train_epoch(model, train_loader, criterion, optimizer, epoch):
+def train_epoch(model, train_loader, criterion, optimizer, epoch, cfg):
     epoch_loss = 0
     iter = (epoch - 1) * len(train_loader) + 1
     with tqdm(train_loader, unit="batch") as tepoch:
@@ -38,7 +38,7 @@ def train_epoch(model, train_loader, criterion, optimizer, epoch):
 
             # predict pose
             estimate_pose = model(images.float())
-            loss = criterion(estimate_pose, gt.float())
+            loss = compute_loss(estimate_pose, gt.float(), criterion, cfg)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -48,20 +48,20 @@ def train_epoch(model, train_loader, criterion, optimizer, epoch):
     
     return epoch_loss / len(train_loader)
 
-def train(model, train_loarder, val_loader, criterion, optimizer, cfg):
+def train(model, train_loader, val_loader, criterion, optimizer, cfg):
     epochs = cfg.epoch
     checkpoint_path = cfg.checkpoint_path
     epoch_init = cfg.epoch_init
 
-    for epoch in range(epoch_init-1, epochs):
+    for epoch in range(epoch_init, epochs+1):
         model.train()
-        train_loss = train_epoch(model, train_loader, criterion, optimizer, epoch)
+        train_loss = train_epoch(model, train_loader, criterion, optimizer, epoch, cfg)
 
         # validate model
         if val_loader:
             with torch.no_grad():
                 model.eval()
-                val_loss = val_epoch(model, val_loader, criterion)
+                val_loss = val_epoch(model, val_loader, criterion, cfg)
 
             print(f"Epoch: {epoch} - loss: {train_loss:.4f} - val_loss: {val_loss:.4f} \n")
 
@@ -77,6 +77,20 @@ def train(model, train_loarder, val_loader, criterion, optimizer, cfg):
         torch.save(state, os.path.join(checkpoint_path, "checkpoint_last.pth"))
 
     return
+
+def compute_loss(y_hat, y, criterion, cfg):
+    y_hat = torch.reshape(y_hat, (y_hat.shape[0], cfg.num_frames-1, 6))
+    estimated_angles = y_hat[:, :, :3].flatten()
+    estimated_position = y_hat[:, :, 3:].flatten()
+
+    y = torch.reshape(y, (y.shape[0], cfg.num_frames-1, 6))
+    gt_angles = y[:, :, 3:].flatten()
+    gt_position = y[:, :, :3].flatten()
+
+    loss_angles = 100 * criterion(gt_angles.float(), estimated_angles)
+    loss_position = criterion(gt_position.float(), estimated_position)
+    loss = 1000 * (loss_angles + loss_position)
+    return loss
 
 
 if __name__ == "__main__":
@@ -99,13 +113,13 @@ if __name__ == "__main__":
     train_data, val_data = random_split(dataset, [len(dataset) - nb_val, nb_val]) 
     
     train_loader = torch.utils.data.DataLoader(train_data,
-                                               batch_size=config.batch_size,
-                                               shuffle=True,
-                                               )
+                                            batch_size=config.batch_size,
+                                            shuffle=True,
+                                            )
     val_loader = torch.utils.data.DataLoader(val_data,
-                                             batch_size=1,
-                                             shuffle=False,
-                                             )
+                                                batch_size=1,
+                                                shuffle=False,
+                                                )
 
     # build and load model
     print("Building model...")
