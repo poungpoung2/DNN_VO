@@ -1,4 +1,8 @@
 import torch
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> 8f68463ff953d2558688b362c979be2af3d09cf3
 from torch.utils.data import Dataset
 from pathlib import Path
 from torchvision.transforms import v2
@@ -11,6 +15,7 @@ from utils import get_relative_pose
 class VODataset(Dataset):
     def __init__(self, config, base_dir, cam_num, transform=None):
         # Initialize data, download, etc.
+<<<<<<< HEAD
         self.image_dir = base_dir / f"cam{cam_num}"
         self.pose_dir = base_dir / "poses.csv"
 
@@ -27,6 +32,25 @@ class VODataset(Dataset):
             self.transforms = transform
 
         self.num_frames = config.num_frames
+=======
+        image_dir = os.path.join(Path(config.data_dir), "cam0")
+        pose_dir = os.path.join(Path(config.data_dir), "poses.csv")
+        self.image_dir = Path(image_dir)
+
+        if transform is None:
+                # preprocessing operation
+            self.transforms = transforms.Compose([
+                transforms.Resize((config.image_size)),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.34721234, 0.36705238, 0.36066107],
+                    std=[0.30737526, 0.31515116, 0.32020183]),
+            ])
+        else:
+            self.transforms = transform
+
+        self.clip_size = config.num_frames
+>>>>>>> 8f68463ff953d2558688b362c979be2af3d09cf3
         self.clips = []
         for i in range(len(list(self.image_dir.glob("*.jpg"))) - self.num_frames + 1):
             self.clips.append((i, i + self.num_frames))

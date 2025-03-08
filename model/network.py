@@ -71,10 +71,15 @@ class Block(nn.Module):
         super().__init__()
         self.attention_type = "divided_space_time"
 
-        # Temporal Attention
+        # Spatial Attention
         self.norm1 = norm_layer(dim)
         self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, qkv_scale=qkv_scale, attn_drop=attn_drop)
-        self.fc = nn.Linear(dim, dim)
+
+        # Temporal Attention
+        self.temporal_norm1 = norm_layer(dim)
+        self.temporal_attn = Attention(
+            dim, num_heads=num_heads, qkv_bias=qkv_bias, qkv_scale=qkv_scale, attn_drop=attn_drop, proj_drop=drop)
+        self.temporal_fc = nn.Linear(dim, dim)
 
         ## drop path
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
@@ -89,9 +94,9 @@ class Block(nn.Module):
         # Temporal
         xt = x[:, 1:, :]
         xt = rearrange(xt, 'b (h w t) m -> (b h w) t m',b=B,h=H,w=W,t=T)
-        res_temporal = self.drop_path(self.attn(self.norm1(xt)))
+        res_temporal = self.drop_path(self.temporal_attn(self.temporal_norm1(xt)))
         res_temporal = rearrange(res_temporal, '(b h w) t m -> b (h w t) m',b=B,h=H,w=W,t=T)
-        res_temporal = self.fc(res_temporal)
+        res_temporal = self.temporal_fc(res_temporal)
         xt = x[:, :1, :] + res_temporal
 
         # Spatial

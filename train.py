@@ -1,11 +1,13 @@
 import os
 import torch
+import torch.nn as nn
 import torch.optim as optim
 import torch.utils
 import torch.utils.data
 from tqdm import tqdm
 from torchvision import transforms
 from dataset import VODataset
+from model.network import VisionTransformer
 from torch.utils.data import random_split
 import pickle
 import json
@@ -111,6 +113,7 @@ def training_validation(
         model.train()
         train_loss = 0.0
 
+
         train_batch_iterator = tqdm(
             train_dataloader, desc=f"Processing Epoch {epoch + 1} [Train]"
         )
@@ -120,6 +123,7 @@ def training_validation(
         for i, (image, pose) in enumerate(train_batch_iterator):
             image = image.to(device)
             pose = pose.to(device)
+
 
             pred = model(image)
             loss = loss_fn(pred, pose)
@@ -149,6 +153,7 @@ def training_validation(
                 image = image.to(device)
                 pose = pose.to(device)
 
+
                 pred = model(image)
                 loss = loss_fn(pred, pose)
                 val_loss += loss.item()
@@ -161,6 +166,7 @@ def training_validation(
 
         val_loss /= len(val_dataloader)
         writer.add_scalar("val_loss", val_loss, epoch + 1)
+
 
         print(
             f"Epoch {epoch + 1}: Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}"
@@ -183,12 +189,37 @@ def training_validation(
     writer.close()
     config.save_config()
 
+def get_model(config):
+    model = VisionTransformer(img_size=config.image_size,
+                              num_classes=config.num_classes,
+                              patch_size=config.patch_size,
+                              embed_dim=config.dim,
+                              depth=config.depth,
+                              num_heads=config.num_heads,
+                              mlp_ratio=4,
+                              qkv_bias=True,
+                              norm_layer=partial(nn.LayerNorm, eps=1e-6),
+                              drop_rate=0.,
+                              attn_drop_rate=config.attn_dropout,
+                              drop_path_rate=config.ff_dropout,
+                              num_frames=config.num_frames)
+    
+     state_dict = torch.load(config.pretrained)
+     model.load_state_dict(state_dict["model_state_dict"])
+
+    return model 
 
 def main():
-    config = Config()
+    config = Config()    
     config.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    seed_set()
+    flush()
+    
     train_dataloader, val_dataloader = get_dataloaders(config)
-
+    model = get_model().to(config.device)
+    
+    
     optimizer, lr_scheduler = get_optimizer(
         config=config, len_dataloader=len(train_dataloader, model=model)
     )
@@ -207,3 +238,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+ 
+
+
