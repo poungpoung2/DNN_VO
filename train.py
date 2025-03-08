@@ -86,6 +86,21 @@ def get_optimizer(config, len_dataloader, model, warm_up_duration=0.1):
 
     return optimizer, lr_scheduler
 
+def compute_loss(pred, gt, cfg, loss_fn):
+
+    pred = torch.reshape(pred, (pred.shape[0], cfg.num_frames-1, 6))
+    estimated_angles = pred[:, :, :3].flatten()
+    estimated_position = pred[:, :, 3:].flatten()
+
+    gt = torch.reshape(gt, (gt.shape[0], cfg.num_frames-1, 6))
+    gt_angles = gt[:, :, 3:].flatten()
+    gt_position = gt[:, :, :3].flatten()
+ 
+    loss_angles = 100 * loss_fn(gt_angles.float(), estimated_angles)
+    loss_position = loss_fn(gt_position.float(), estimated_position)
+    loss = 1000 * (loss_angles + loss_position)
+    return loss
+
 
 def training_validation(
     config,
@@ -127,7 +142,7 @@ def training_validation(
 
 
             pred = model(image)
-            loss = loss_fn(pred, pose)
+            loss = compute_loss(pred, pose, config, loss_fn)
             train_loss += loss.item()
             train_batch_iterator.set_postfix(batch_loss=loss.item())
 
