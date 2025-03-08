@@ -5,18 +5,30 @@ import pickle
 class Config:
     def __init__(self, config_file=None):
         self.device = None
+        
         # Model settings
-        self.clip_size = 3
-        self.img_height = 192
-        self.img_width = 640
-        self.batch_size = 4
+        self.dim = 384
+        self.image_size = (194, 640)
+        self.patch_size = 16
+        self.num_classes = 6 * (self.num_frames - 1)
+        self.depth = 12
+        self.num_heads = 6
+        self.dim_head = 64
+        self.attn_dropout = 0.1
+        self.ff_dropout = 0.1
         self.num_workers = 4
+        
+        # tiny  - patch_size=16, embed_dim=192, depth=12, num_heads=3
+        # small - patch_size=16, embed_dim=384, depth=12, num_heads=6
+        # base  - patch_size=16, embed_dim=768, depth=12, num_heads=12
+        
+        #data
         self.data_dir = Path("data")
 
-        self.config_path = Path("config.pkl")
 
         # Training
         self.lr = 1e-5
+        self.batch_size = 2
 
         # Checkpoint
         self.checkpoint_dir = Path("checkpoint")
@@ -24,6 +36,8 @@ class Config:
         self.best_loss = float("inf")
         self.best_loss_epoch = 0
         self.global_epoch = 0
+        self.config_path = Path("config.pkl")
+
 
         if config_file:
             self.config_path = Path(config_file)
