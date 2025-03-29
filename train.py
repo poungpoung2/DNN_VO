@@ -78,7 +78,7 @@ def get_optimizer(config, len_dataloader, model, warm_up_duration=0.1):
     num_warmup_steps = num_training_steps * warm_up_duration
 
     lr_scheduler = get_scheduler(
-        name="linear_with_warmup",
+        name="linear",
         optimizer=optimizer,
         num_warmup_steps=num_warmup_steps,
         num_training_steps=num_training_steps,
@@ -96,9 +96,9 @@ def compute_loss(pred, gt, cfg, loss_fn):
     gt_angles = gt[:, :, 3:].flatten()
     gt_position = gt[:, :, :3].flatten()
  
-    loss_angles = 100 * loss_fn(gt_angles.float(), estimated_angles)
-    loss_position = loss_fn(gt_position.float(), estimated_position)
-    loss = 1000 * (loss_angles + loss_position)
+    loss_angles = loss_fn(10000*gt_angles.float(), 10000*estimated_angles)
+    loss_position = loss_fn(1000*gt_position.float(), 1000*estimated_position)
+    loss = (loss_angles + loss_position)
     return loss
 
 
@@ -113,14 +113,17 @@ def training_validation(
     load_best=True,
 ):
     best_loss = float("inf")
-    best_model_path = config.checkpoint_dir / f"best_model.pth"
+    best_model_path = config.checkpoint_dir / f"best.pth"
+    last_model_path = config.checkpoint_dir / f"last.pth"
 
     if best_model_path.is_file():
         checkpoint = torch.load(best_model_path)
         model.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         scheduler.load_state_dict(checkpoint["scheduler"])
-        config.global_epoch = checkpoint["epoch"] + 1
+        # config.global_epoch = checkpoint["epoch"] + 1
+        config.global_epoch = 0
+        checkpoint["epoch"] = 0
 
     writer = SummaryWriter("runs")
     device = config.device
@@ -171,7 +174,7 @@ def training_validation(
 
 
                 pred = model(image)
-                loss = loss_fn(pred, pose)
+                loss = compute_loss(pred, pose, config, loss_fn)
                 val_loss += loss.item()
 
                 writer.add_scalar(
@@ -201,6 +204,17 @@ def training_validation(
             }
 
             torch.save(checkpoint, best_model_path)
+
+        
+        checkpoint = {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
+            "epoch": epoch,
+        }
+
+        torch.save(checkpoint, last_model_path)
+
 
     writer.close()
     config.save_config()
@@ -233,12 +247,11 @@ def main():
     flush()
     
     train_dataloader, val_dataloader = get_dataloaders(config)
-    model = get_model().to(config.device)
+    model = get_model(config).to(config.device)
     
     
     optimizer, lr_scheduler = get_optimizer(
-        config=config, len_dataloader=len(train_dataloader, model=model)
-    )
+        config=config, len_dataloader=len(train_dataloader), model=model)
 
     loss_fn = torch.nn.MSELoss()
     training_validation(
