@@ -5,13 +5,10 @@ import torch.optim as optim
 import torch.utils
 import torch.utils.data
 from tqdm import tqdm
-from torchvision import transforms
 from dataset import VODataset
 from model.network import VisionTransformer
 from torch.utils.data import random_split
 from functools import partial
-import pickle
-import json
 import gc
 from dataset import VODataset
 from torch.utils.data import DataLoader, random_split, ConcatDataset
@@ -96,8 +93,8 @@ def compute_loss(pred, gt, cfg, loss_fn):
     gt_angles = gt[:, :, 3:].flatten()
     gt_position = gt[:, :, :3].flatten()
  
-    loss_angles = loss_fn(10000*gt_angles.float(), 10000*estimated_angles)
-    loss_position = loss_fn(1000*gt_position.float(), 1000*estimated_position)
+    loss_angles = 100*loss_fn(gt_angles.float(), estimated_angles)
+    loss_position = loss_fn(gt_position.float(), estimated_position)
     loss = (loss_angles + loss_position)
     return loss
 
@@ -234,6 +231,9 @@ def get_model(config):
                               drop_path_rate=config.ff_dropout,
                               num_frames=config.num_frames)
     
+    if config.pretrained is None:
+        print("No pretrained model provided. Training from scratch.")
+        return model
     state_dict = torch.load(config.pretrained)
     model.load_state_dict(state_dict["model_state_dict"])
 

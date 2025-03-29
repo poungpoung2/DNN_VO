@@ -8,6 +8,7 @@ class Config:
         
         # Model settings
         self.dim = 384
+        self.num_frames = 3
         self.image_size = (194, 640)
         self.patch_size = 16
         self.num_classes = 6 * (self.num_frames - 1)
@@ -28,7 +29,8 @@ class Config:
 
         # Training
         self.lr = 1e-5
-        self.batch_size = 2
+        self.batch_size = 4
+        self.epochs = 100
 
         # Checkpoint
         self.checkpoint_dir = Path("checkpoint")
@@ -37,6 +39,7 @@ class Config:
         self.best_loss_epoch = 0
         self.global_epoch = 0
         self.config_path = Path("config.pkl")
+        self.pretrained = None
 
 
         if config_file:
