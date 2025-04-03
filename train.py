@@ -5,12 +5,10 @@ import torch.optim as optim
 import torch.utils
 import torch.utils.data
 from tqdm import tqdm
-from torchvision import transforms
 from dataset import VODataset
 from model.network import VisionTransformer
 from torch.utils.data import random_split
-import pickle
-import json
+from functools import partial
 import gc
 from dataset import VODataset
 from torch.utils.data import DataLoader, random_split, ConcatDataset
@@ -77,13 +75,28 @@ def get_optimizer(config, len_dataloader, model, warm_up_duration=0.1):
     num_warmup_steps = num_training_steps * warm_up_duration
 
     lr_scheduler = get_scheduler(
-        name="linear_with_warmup",
+        name="linear",
         optimizer=optimizer,
         num_warmup_steps=num_warmup_steps,
         num_training_steps=num_training_steps,
     )
 
     return optimizer, lr_scheduler
+
+def compute_loss(pred, gt, cfg, loss_fn):
+
+    pred = torch.reshape(pred, (pred.shape[0], cfg.num_frames-1, 6))
+    estimated_angles = pred[:, :, :3].flatten()
+    estimated_position = pred[:, :, 3:].flatten()
+
+    gt = torch.reshape(gt, (gt.shape[0], cfg.num_frames-1, 6))
+    gt_angles = gt[:, :, 3:].flatten()
+    gt_position = gt[:, :, :3].flatten()
+ 
+    loss_angles = 100*loss_fn(gt_angles.float(), estimated_angles)
+    loss_position = loss_fn(gt_position.float(), estimated_position)
+    loss = (loss_angles + loss_position)
+    return loss
 
 
 def training_validation(
@@ -97,14 +110,17 @@ def training_validation(
     load_best=True,
 ):
     best_loss = float("inf")
-    best_model_path = config.checkpoint_dir / f"best_model.pth"
+    best_model_path = config.checkpoint_dir / f"best.pth"
+    last_model_path = config.checkpoint_dir / f"last.pth"
 
     if best_model_path.is_file():
         checkpoint = torch.load(best_model_path)
         model.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         scheduler.load_state_dict(checkpoint["scheduler"])
-        config.global_epoch = checkpoint["epoch"] + 1
+        # config.global_epoch = checkpoint["epoch"] + 1
+        config.global_epoch = 0
+        checkpoint["epoch"] = 0
 
     writer = SummaryWriter("runs")
     device = config.device
@@ -126,7 +142,7 @@ def training_validation(
 
 
             pred = model(image)
-            loss = loss_fn(pred, pose)
+            loss = compute_loss(pred, pose, config, loss_fn)
             train_loss += loss.item()
             train_batch_iterator.set_postfix(batch_loss=loss.item())
 
@@ -155,7 +171,7 @@ def training_validation(
 
 
                 pred = model(image)
-                loss = loss_fn(pred, pose)
+                loss = compute_loss(pred, pose, config, loss_fn)
                 val_loss += loss.item()
 
                 writer.add_scalar(
@@ -186,6 +202,17 @@ def training_validation(
 
             torch.save(checkpoint, best_model_path)
 
+        
+        checkpoint = {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
+            "epoch": epoch,
+        }
+
+        torch.save(checkpoint, last_model_path)
+
+
     writer.close()
     config.save_config()
 
@@ -204,8 +231,11 @@ def get_model(config):
                               drop_path_rate=config.ff_dropout,
                               num_frames=config.num_frames)
     
-     state_dict = torch.load(config.pretrained)
-     model.load_state_dict(state_dict["model_state_dict"])
+    if config.pretrained is None:
+        print("No pretrained model provided. Training from scratch.")
+        return model
+    state_dict = torch.load(config.pretrained)
+    model.load_state_dict(state_dict["model_state_dict"])
 
     return model 
 
@@ -217,12 +247,11 @@ def main():
     flush()
     
     train_dataloader, val_dataloader = get_dataloaders(config)
-    model = get_model().to(config.device)
+    model = get_model(config).to(config.device)
     
     
     optimizer, lr_scheduler = get_optimizer(
-        config=config, len_dataloader=len(train_dataloader, model=model)
-    )
+        config=config, len_dataloader=len(train_dataloader), model=model)
 
     loss_fn = torch.nn.MSELoss()
     training_validation(
@@ -240,5 +269,3 @@ if __name__ == "__main__":
     main()
 
  
-
-
